@@ -1,5 +1,5 @@
 # dl2dir
-A personal script to Download Weblinks with axel to subfolders in a base directory. Configured for mp4, but can be used for any file.
+A personal script to Download Weblinks with axel to subfolders in a base directory. Configured for mp4, but can be used for any file. The Script will only create subfolders in the defined Base Directory. 
 
 This will be enhanced with optional download methods.
 Primary use is intended for downloading media files that I can separate into subfolders.
