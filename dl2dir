@@ -1,0 +1,166 @@
+#!/bin/sh
+##Variables
+#export user defined variables to config File...eventually
+#BaseDirectory="/home/opt/test" #BEBUG Target aquired
+BaseDirectory="${HOME}" #Target aquired
+FileExtension="mp4"	#File extension
+FileTitle=''	# file title
+category=""
+Directory=""	#category/Directory to be installed to, expand to seperate vars...
+WebLink=""	#fileserver, for debuging
+###############
+##colors. YAS##
+###############
+cD="\e[0m"	#color default
+cR="\e[31m"	#Red
+cG="\e[32m"	#Green
+cY="\e[33m"	#Yellow
+cF="\e[35m"	#Fushia
+cB="\e[36m"	#Blue
+cBase=${cD}
+cERROR=${cR}
+cDIR=${cY}
+cFILE=${cG}
+##############
+usage()	{
+	echo "
+This script is for downloading Videos to subdirectories of a Base Directoy.
+It is defaulted to a mp4 extension, but you can supply your own extension,
+so really you use this to download anything to a subfolder.
+	$(basename ${0}) <options>
+${cR}NOTE: Limit errors by enclosing Directories, Title & Link with ${cG}\"${cR}Quotes${cG}\"${cD}
+	-L	${cG}\"${cY}<http://linkto.com/file.whatever>${cG}\" ${CY}file to be downloaded${cD}
+	-B	${cG}\"${cY}</path/to/base/Directory>${cG}\"	${CY}Base folder to create a subfolder${cD}
+	-D	${cG}\"${cY}<Sub/Directory>${cG}\"	${CY}Directory/ies to create and download file to${cD}
+	-T	${cG}\"${cY}<title>${cG}\"	${CY}This will be the files output name${cD}
+	-e	${cY}<extension>	${cG}Default is mp4; change to match your needs${cD}
+	-d	${cF}Flag to only Show Variable information, similar to a dry run${cD}
+	-y	${cF}Flag to bypass Confirmation. Download begin immediately.${cD}
+	-h	This stuff
+"
+}
+###############
+##Get options##
+###############
+DEBUG=0
+CONFIRMED=0
+if [ ""${1}"" = "" ]; then
+	usage;
+	exit;
+else
+while	getopts	':B:D:T:L:e:h:dy'	OPT;	do
+	case	"${OPT}"	in
+	B)	export	BaseDirectory="${OPTARG}";;
+	T)	export	FileTitle="${OPTARG}";;
+	D)	export	Directory="${OPTARG}";;
+	L)	export	WebLink="${OPTARG}";;
+	e)	export	FileExtension="${OPTARG}";;
+	d)	export	DEBUG=1;;
+	y)	export	CONFIRMED=1;;
+	h)	usage && exit	1;;
+	*)	usage	&&	exit	1;;
+	esac
+done
+shift	$((OPTIND-1))
+fi
+
+#Set Directoy and FileNameExtension from options
+FileNameExtension="${FileTitle}.${FileExtension}"	#Set destination FileNameExtension
+DestionationDirectory="$BaseDirectory/$Directory"	#Set Directory
+FinalDestination="$DestionationDirectory/$FileNameExtension"	#Set Full Directory/FileNameExtension. Just to be Sure.
+#Functions
+
+CheckVars(){ #check if VARS are filled
+	pleaseFix="Please fix the ${cERROR}"
+	if [ ${#BaseDirectory} ]; then echo "${pleaseFix}BaseDirectory${cBase}"; exit; fi
+	if [ ${#Directory} = 0 ]; then echo "${pleaseFix}category/Directory${cBase}"; exit; fi
+	if [ ${#FileTitle} = 0 ]; then echo "${pleaseFix}Title${cBase}"; exit; fi
+	if [ ${#WebLink} = 0 ]; then echo "${pleaseFix}WebLink${cBase}"; exit; fi
+}
+
+debug(){
+	CheckExistingFile(){
+		msg="Destination File = ${cF}'${FinalDestination}'"
+	if [ -f "${FinalDestination}" ];
+		then echo "${msg}${cR}	File Already Exist${cD}";
+	else echo "${msg}${cD}"
+fi
+	}
+	echo "
+		Preparing to Download with these variables:\n
+		Title = ${cFILE}${FileTitle}${cD}\n
+		category/Directory = ${cDIR}${Directory}${cD}\n
+		Full Directory = ${cDIR}${DestionationDirectory}${cD}\n
+		WebLink = ${cB}${WebLink}${cD} \n
+		$(CheckExistingFile)
+		"
+}
+CheckAxel()	{ #Check for Axel
+	#Uses axel to accelerate Download
+	if [ $(which axel) ]; then return 1; else echo "${cERROR}Install Axel${cD}"; exit; fi
+}
+CheckConfirm(){	#Check for non-interactive
+	if [ $CONFIRMED = 1 ];
+		then echo "${cG}Confirmed${cD}";
+	else echo "	${cF}Everything look good???${cD}\n			${cG}y${cD}/${cR}n${cD}"
+		read confirm
+		case $confirm in
+				y) echo "${cG}Confirmed${cD}";;
+				*) echo "${cR}It's okay, we can try again later...${cD}";exit;;
+		esac
+	fi
+}
+ChangeDirectory()	{
+	if [ ! -d "$(echo ${@})" ];
+		then echo "${cERROR}ERROR: Directory does not exist.\n$@\nPlease Check locations.${cD}";	exit
+	else echo "${cD}Changing Directory to ${cDIR}$@${cD}";
+		cd "$(echo ${@})";
+		if [ "${PWD}" = "$(echo ${@})" ];
+			then echo "${cG}Succesfully${cD} changed directory to ${cDIR}$PWD${cD}"
+		else echo "${cERROR}ERROR: Unable to change directory to ${cERROR}$@${cD}\nWe are currently in Directory ${cDIR}$PWD${cD}";ls; exit
+		fi
+	fi
+}
+DestDirSetup()	{	#DestionatioDirectory setup
+	if [ ! -d "$DestionationDirectory" ]
+		then	echo	"${cDIR}Making Destination Directory\n$DestionationDirectory${cD}";
+		mkdir -p "$DestionationDirectory"
+	fi
+}
+mvFileDest()	{	#Move Old File expand to move or overwrite
+	stamp=$(date "+%y%m%d%H%M%S")
+	oldMovie=$(echo $FileNameExtension | sed "s/.${FileExtension}/.${stamp}.${FileExtension}/g");
+	if [ -f "$FinalDestination" ];
+		then	echo "${cB}moving previous Movie file${cD} \n mv "${cR}${FileNameExtension}${cD}" >-> "${cFILE}${oldMovie}"${cD}";
+		mv "${FileNameExtension}" "${oldMovie}";
+	else echo "${cY}movie file does not exist${cD}";
+	fi;
+}
+DOWNLOAD(){	#Axel downloader
+	echo ${cF}
+	axel -a -n 7 "$WebLink" -o "$FinalDestination";
+	echo ${cD}
+}
+LastCheck()	{
+	if [ "${CONFIRMED}" = "1" ]; then DOWNLOAD
+else echo "${cY}y ${cD}to continue"
+			read READY
+			if [ $READY = "y" ];
+				then	DOWNLOAD
+				else echo "${cR}Aborting${cD}"; exit
+			fi
+	fi
+}
+main()	{	#Main function
+	CheckAxel
+	CheckVars
+	if [ $DEBUG = "1" ]; then debug; exit;else debug; fi	#Display debug only or display and continue
+	CheckConfirm
+	ChangeDirectory ${BaseDirectory}	#Change to base directory
+	DestDirSetup	#setup Destination Directory
+	ChangeDirectory ${DestionationDirectory}	#Change to Destination Directory
+	mvFileDest	#If Destination File exist, move and change name by appending date and time <FileName.YYMMDDHHMMSS.ext>
+	LastCheck	#Last Chance
+}
+####
+main
